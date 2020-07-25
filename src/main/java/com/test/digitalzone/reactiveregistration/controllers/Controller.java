@@ -37,7 +37,7 @@ public class Controller {
         try {
             return statisticsService.getStatisticsByDates(startDateCandidate.get(), endDateCandidate.get()).get();
         } catch (InterruptedException | ExecutionException e) {
-            throw new IllegalStateException(e.getMessage());
+            throw new IllegalStateException(e);
         }
     }
 }

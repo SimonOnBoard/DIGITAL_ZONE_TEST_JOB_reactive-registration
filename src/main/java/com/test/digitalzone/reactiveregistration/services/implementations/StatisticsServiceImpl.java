@@ -4,6 +4,7 @@ import com.test.digitalzone.reactiveregistration.dto.StatisticsDto;
 import com.test.digitalzone.reactiveregistration.models.ViewEvent;
 import com.test.digitalzone.reactiveregistration.services.interfaces.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.util.Pair;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.AsyncResult;
@@ -68,7 +69,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             List<String> names = tableNames.get();
             List<Future<List<ViewEvent>>> events = new ArrayList<>(names.size());
             for (int i = 0; i < names.size(); i++) {
-                events.set(i, statisticsGenerationService.getAllEventsByTableBetween(start, end, names.get(i)));
+                events.add(i, statisticsGenerationService.getAllEventsByTableBetween(start, end, names.get(i)));
             }
 
             List<List<ViewEvent>> resultEventsFromDatabase = new ArrayList<>(names.size());
@@ -77,8 +78,8 @@ public class StatisticsServiceImpl implements StatisticsService {
             List<Future<Boolean>> listToCheckVoidMethodsToComplete = new ArrayList<>(names.size());
 
             for (int i = 0; i < events.size(); i++) {
-                resultEventsFromDatabase.set(i, events.get(i).get());
-                listToCheckVoidMethodsToComplete.set(i, statisticsGenerationService.addAllEventsToIndex(
+                resultEventsFromDatabase.add(i, events.get(i).get());
+                listToCheckVoidMethodsToComplete.add(i, statisticsGenerationService.addAllEventsToIndex(
                         caseAndNameForIndex, resultEventsFromDatabase.get(i), start, end, names.get(i)));
             }
 
@@ -89,11 +90,12 @@ public class StatisticsServiceImpl implements StatisticsService {
             int size = (int) Math.round(-uniqueViewersNumber / LN09);
             List<Future<byte[]>> futureResultArraysToCall = new ArrayList<>(names.size());
             for (int i = 0; i < names.size(); i++) {
-                futureResultArraysToCall.set(i, statisticsGenerationService.getResultDummyBloomFilter(size, resultEventsFromDatabase.get(i)));
+                futureResultArraysToCall.add(i, statisticsGenerationService.getResultDummyBloomFilter(size, resultEventsFromDatabase.get(i)));
             }
+
             List<byte[]> resultDummyBloomFilters = new ArrayList<>(names.size());
             for(int i = 0; i < names.size(); i++){
-                resultDummyBloomFilters.set(i, futureResultArraysToCall.get(i).get());
+                resultDummyBloomFilters.add(i, futureResultArraysToCall.get(i).get());
             }
             Future<Long> countAll = statisticsGenerationService.calculateAllViews(resultEventsFromDatabase);
             Future<Long> regularUsers = statisticsGenerationService.calculateResultForRegularUsers(resultDummyBloomFilters);
@@ -102,7 +104,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             return AsyncResult.forValue(StatisticsDto.builder().unique(uniqueViewersNumber).count(countAll.get()).regularUsers(regularUsers.get())
                     .build());
         } catch (InterruptedException | ExecutionException e) {
-            throw new IllegalStateException(e.getMessage());
+            throw new IllegalStateException(e);
         }
     }
 }

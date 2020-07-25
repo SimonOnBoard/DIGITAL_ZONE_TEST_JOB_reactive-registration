@@ -3,10 +3,12 @@ package com.test.digitalzone.reactiveregistration;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Scope;
 import org.springframework.core.env.Environment;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
@@ -20,6 +22,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
+import java.util.zip.Adler32;
 
 @SpringBootApplication
 @EnableAsync
@@ -37,7 +40,7 @@ public class ReactiveRegistrationApplication {
     @Bean
     @Primary
     public LettuceConnectionFactory redisConnectionFactory() {
-        RedisStandaloneConfiguration redisStandaloneConfiguration = new RedisStandaloneConfiguration("localhost", 6379);
+        RedisStandaloneConfiguration redisStandaloneConfiguration = new RedisStandaloneConfiguration(environment.getProperty("spring.redis.host"), Integer.parseInt(environment.getProperty("spring.redis.port")));
         return new LettuceConnectionFactory(redisStandaloneConfiguration);
     }
 
@@ -45,13 +48,11 @@ public class ReactiveRegistrationApplication {
     public RedisTemplate<String, String> redisTemplate() {
         RedisTemplate<String, String> template = new RedisTemplate<>();
         RedisSerializer<String> stringSerializer = new StringRedisSerializer();
-        JdkSerializationRedisSerializer jdkSerializationRedisSerializer = new JdkSerializationRedisSerializer();
         template.setConnectionFactory(redisConnectionFactory());
         template.setKeySerializer(stringSerializer);
         template.setHashKeySerializer(stringSerializer);
         template.setValueSerializer(stringSerializer);
         template.setHashValueSerializer(stringSerializer);
-        //template.setEnableTransactionSupport(true);
         template.afterPropertiesSet();
         return template;
     }
@@ -85,4 +86,10 @@ public class ReactiveRegistrationApplication {
     public DataSource hikariDataSource(HikariConfig hikariConfig) {
         return new HikariDataSource(hikariConfig);
     }
+
+//    @Bean
+//    @Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+//    public Adler32 adler32(){
+//        return new Adler32();
+//    }
 }

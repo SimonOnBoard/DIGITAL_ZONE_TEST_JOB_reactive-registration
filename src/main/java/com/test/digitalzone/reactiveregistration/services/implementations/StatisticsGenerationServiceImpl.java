@@ -50,7 +50,7 @@ public class StatisticsGenerationServiceImpl implements StatisticsGenerationServ
             Long minLastDayId = viewEventFindQueuesRepository.findIdByLowerBound(tableName, end.toLocalDate().atTime(LocalTime.MIN));
 
             for (ViewEvent viewEvent : events) {
-                if (viewEvent.getId() <= maxFirstDayId | viewEvent.getId() >= minLastDayId) {
+                if (viewEvent.getId() <= maxFirstDayId | (minLastDayId != null && viewEvent.getId() >= minLastDayId)) {
                     redisService.publishUserId(viewEvent.getUserId(), caseAndIndexName.getSecond());
                 }
             }
@@ -71,6 +71,7 @@ public class StatisticsGenerationServiceImpl implements StatisticsGenerationServ
         for (ViewEvent viewEvent : viewEvents) {
             adler23.update(viewEvent.getUserId().getBytes(), 0, viewEvent.getUserId().length());
             resultArray[(int) (adler23.getValue() % size)] += 1;
+            adler23.reset();
         }
         return AsyncResult.forValue(resultArray);
     }
