@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class StatisticsDto {
     private Long count;
     private Long unique;
+    private Long regularUsers;
 }

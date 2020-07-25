@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.concurrent.Future;
 
 public interface TablesService {
-    Future<String> getCurrentTableName(String url);
+    String getCurrentTableName(String url);
     void createTableById(Long id);
-    List<String> getAllTables();
+    Future<List<String>> getAllTables();
 }

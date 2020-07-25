@@ -29,7 +29,6 @@ public class TablesRepositoryImpl implements TablesRepository {
     @Override
     public Table save(Table table) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
-
         template.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(SQL_INSERT_INTO_TABLES, new String[]{"id"});
             ps.setString(1, table.getName());

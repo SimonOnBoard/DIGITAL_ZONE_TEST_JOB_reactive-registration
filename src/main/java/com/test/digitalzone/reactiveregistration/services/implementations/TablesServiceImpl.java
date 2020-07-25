@@ -22,15 +22,14 @@ public class TablesServiceImpl implements TablesService {
         tablesRepository.createTables();
     }
 
-    @Async("threadPoolTaskExecutor")
     @Override
-    public Future<String> getCurrentTableName(String url) {
+    public synchronized String getCurrentTableName(String url) {
         Table table = tablesRepository.findByName(url);
         if(table == null){
             table = tablesRepository.save(Table.builder().name(url).build());
             createTableById(table.getId());
         }
-        return AsyncResult.forValue(getStringFromId(table.getId()));
+        return getStringFromId(table.getId());
     }
     @Override
     public void createTableById(Long id) {
@@ -41,9 +40,10 @@ public class TablesServiceImpl implements TablesService {
         }
     }
 
+    @Async("threadPoolTaskExecutor")
     @Override
-    public List<String> getAllTables() {
-        return tablesRepository.findAllNames();
+    public Future<List<String>> getAllTables() {
+        return AsyncResult.forValue(tablesRepository.findAllNames());
     }
 
     public String getStringFromId(Long id){

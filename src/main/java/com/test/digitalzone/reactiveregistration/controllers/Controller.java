@@ -5,36 +5,39 @@ import com.test.digitalzone.reactiveregistration.dto.StatisticsDto;
 import com.test.digitalzone.reactiveregistration.dto.ViewEventDto;
 import com.test.digitalzone.reactiveregistration.services.interfaces.SaveEventService;
 import com.test.digitalzone.reactiveregistration.services.interfaces.StatisticsService;
+import com.test.digitalzone.reactiveregistration.services.interfaces.TimeConversionService;
+import io.netty.handler.codec.serialization.ObjectEncoder;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import java.util.*;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 @RestController
 @RequiredArgsConstructor
 public class Controller {
     private final SaveEventService saveEventService;
     private final StatisticsService statisticsService;
+    private final TimeConversionService timeConversionService;
 
-//    @GetMapping("/test")
-//    public void testRedis() throws ExecutionException, InterruptedException {
-//        Random random = new Random();
-//        for(int i = 0; i < 100; i++){
-//            publisher.publish("aaa" + i);
-//        }
-//
-////        x.add("day","y");
-////        x.add("day","x");
-////        Mono<Long> y = x.size("day");
-////        y.subscribe(
-////                value -> System.out.println(value),
-////                error -> error.getMessage(),
-////        );
-//    }
-
-    @GetMapping("/registerEvent")
-    public StatisticsDto addViewEvent(@RequestBody ViewEventDto eventDto){
+    @PostMapping("/registerEvent")
+    public StatisticsDto addViewEvent(@RequestBody ViewEventDto eventDto) {
         saveEventService.saveEvent(eventDto);
         return statisticsService.getCurrentDayStatistics();
+    }
+
+    @GetMapping("/getPeriodStatistics")
+    public StatisticsDto getStatisticsForPeriod(@RequestBody List<Map<String, Integer>> mapList) {
+        Future<LocalDateTime> startDateCandidate = timeConversionService.getTimeForStart(mapList.get(0));
+        Future<LocalDateTime> endDateCandidate = timeConversionService.getTimeForEnd(mapList.get(1));
+        try {
+            return statisticsService.getStatisticsByDates(startDateCandidate.get(), endDateCandidate.get()).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new IllegalStateException(e.getMessage());
+        }
     }
 }

@@ -26,27 +26,23 @@ public class SaveEventServiceImpl implements SaveEventService {
     @Async("threadPoolTaskExecutor")
     @Override
     public void saveEvent(ViewEventDto eventDto) {
-        Future<String> nameToGet = tablesService.getCurrentTableName(eventDto.getUrl());
-        try {
-            String tableName = nameToGet.get();
-            ListenableFuture<Long> listenableFuture = redisService.publishUserIdForToday(eventDto.getUserId());
+        String tableName = tablesService.getCurrentTableName(eventDto.getUrl());
 
-            listenableFuture.addCallback(new ListenableFutureCallback<Long>() {
-                @Override
-                public void onFailure(Throwable throwable) {
-                    throw new IllegalStateException(throwable.getMessage());
-                }
+        ListenableFuture<Long> listenableFuture = redisService.publishUserIdForToday(eventDto.getUserId());
 
-                @Override
-                public void onSuccess(Long aLong) {
-                    if (aLong != 0) redisService.updateActualTodayNumber();
-                }
-            });
+        listenableFuture.addCallback(new ListenableFutureCallback<Long>() {
+            @Override
+            public void onFailure(Throwable throwable) {
+                throw new IllegalStateException(throwable.getMessage());
+            }
 
-            viewEventRepository.save(
-                    ViewEvent.builder().userId(eventDto.getUserId()).time(LocalDateTime.now()).build(), tableName);
-        } catch (InterruptedException | ExecutionException e) {
-            throw new IllegalStateException(e.getMessage());
-        }
+            @Override
+            public void onSuccess(Long aLong) {
+                if (aLong != 0) redisService.updateActualTodayNumber();
+            }
+        });
+
+        viewEventRepository.save(
+                ViewEvent.builder().userId(eventDto.getUserId()).time(LocalDateTime.now()).build(), tableName);
     }
 }

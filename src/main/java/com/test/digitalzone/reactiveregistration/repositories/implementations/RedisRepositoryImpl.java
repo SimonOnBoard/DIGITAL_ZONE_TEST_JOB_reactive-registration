@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.PostConstruct;
+import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
@@ -16,10 +17,10 @@ public class RedisRepositoryImpl implements RedisRepository {
     @Qualifier("redisTemplate")
     private final RedisTemplate<String, String> redisTemplate;
 
-    private HyperLogLogOperations<String,String> operations;
+    private HyperLogLogOperations<String, String> operations;
 
     @PostConstruct
-    public void init(){
+    public void init() {
         operations = redisTemplate.opsForHyperLogLog();
     }
 
@@ -32,5 +33,13 @@ public class RedisRepositoryImpl implements RedisRepository {
     public Long pfCount(String key) {
         return operations.size(key);
     }
+
+    @Override
+    public Long pfMerge(String key, List<String> keys) {
+        String[] array = new String[keys.size()];
+        keys.toArray(array);
+        return operations.union(key, array);
+    }
+
 
 }
