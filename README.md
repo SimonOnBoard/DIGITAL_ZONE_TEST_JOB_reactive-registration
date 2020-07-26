@@ -11,4 +11,5 @@
     * spring.redis.port= (default: 6379)
 
 4.Run Maven Goals: clean package
+
 5.Run application from it's main class (if you're using idea just press green play button) or by command line by running java -jar application_name.jar
