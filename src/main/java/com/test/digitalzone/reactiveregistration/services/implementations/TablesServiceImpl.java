@@ -18,26 +18,23 @@ public class TablesServiceImpl implements TablesService {
     private final TablesRepository tablesRepository;
 
     @PostConstruct
-    public void init(){
+    public void init() {
         tablesRepository.createTables();
     }
 
     @Override
     public synchronized String getCurrentTableName(String url) {
         Table table = tablesRepository.findByName(url);
-        if(table == null){
+        if (table == null) {
             table = tablesRepository.save(Table.builder().name(url).build());
             createTableById(table.getId());
         }
         return getStringFromId(table.getId());
     }
+
     @Override
     public void createTableById(Long id) {
-        try {
-          tablesRepository.createTableById(getStringFromId(id));
-        } catch (RuntimeException e) {
-            throw new IllegalStateException(e.getMessage());
-        }
+        tablesRepository.createTableById(getStringFromId(id));
     }
 
     @Async("threadPoolTaskExecutor")
@@ -46,7 +43,7 @@ public class TablesServiceImpl implements TablesService {
         return AsyncResult.forValue(tablesRepository.findAllNames());
     }
 
-    public String getStringFromId(Long id){
+    public String getStringFromId(Long id) {
         return "\"" + id.toString() + "\"";
     }
 }

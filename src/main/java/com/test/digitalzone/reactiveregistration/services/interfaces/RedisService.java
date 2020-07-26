@@ -7,6 +7,7 @@ public interface RedisService {
     void updateActualTodayNumber();
     Long getTodayUniqueNumber();
 
+    void setDay(String day);
 
     Long publishUserId(String userId, String key);
     Long getUniqueNumberForTag(String key);

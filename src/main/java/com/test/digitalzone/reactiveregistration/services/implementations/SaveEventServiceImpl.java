@@ -33,7 +33,7 @@ public class SaveEventServiceImpl implements SaveEventService {
         listenableFuture.addCallback(new ListenableFutureCallback<Long>() {
             @Override
             public void onFailure(Throwable throwable) {
-                throw new IllegalStateException(throwable.getMessage());
+                throw new IllegalStateException(throwable);
             }
 
             @Override

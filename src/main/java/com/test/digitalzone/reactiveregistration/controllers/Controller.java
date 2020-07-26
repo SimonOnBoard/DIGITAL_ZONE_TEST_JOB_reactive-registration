@@ -32,9 +32,9 @@ public class Controller {
 
     @GetMapping("/getPeriodStatistics")
     public StatisticsDto getStatisticsForPeriod(@RequestBody List<Map<String, Integer>> mapList) {
-        Future<LocalDateTime> startDateCandidate = timeConversionService.getTimeForStart(mapList.get(0));
-        Future<LocalDateTime> endDateCandidate = timeConversionService.getTimeForEnd(mapList.get(1));
         try {
+            Future<LocalDateTime> startDateCandidate = timeConversionService.getTimeForStart(mapList.get(0));
+            Future<LocalDateTime> endDateCandidate = timeConversionService.getTimeForEnd(mapList.get(1));
             return statisticsService.getStatisticsByDates(startDateCandidate.get(), endDateCandidate.get()).get();
         } catch (InterruptedException | ExecutionException e) {
             throw new IllegalStateException(e);

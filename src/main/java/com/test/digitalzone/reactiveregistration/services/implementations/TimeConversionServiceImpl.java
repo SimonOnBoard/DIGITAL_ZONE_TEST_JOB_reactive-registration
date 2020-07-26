@@ -5,13 +5,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.AsyncResult;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Calendar;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 
@@ -21,7 +21,7 @@ public class TimeConversionServiceImpl implements TimeConversionService {
 
     @Async("threadPoolTaskExecutor")
     @Override
-    public Future<LocalDateTime> getTimeForStart(Map<String, Integer> mapToConvert) {
+    public Future<LocalDateTime> getTimeForStart(Map<String, Integer> mapToConvert) throws ExecutionException, InterruptedException {
         checkMap(mapToConvert);
         LocalDate localDate;
         LocalDateTime result;
@@ -30,24 +30,7 @@ public class TimeConversionServiceImpl implements TimeConversionService {
         } else {
             localDate = LocalDate.of(mapToConvert.get("year"), mapToConvert.get("month"), 1);
         }
-        if (mapToConvert.get("hours") != null) {
-            if (mapToConvert.get("minutes") != null) {
-                if (mapToConvert.get("seconds") != null) {
-                    if (mapToConvert.get("milliseconds") != null) {
-                        result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes"), mapToConvert.get("seconds"), mapToConvert.get("milliseconds")));
-                    } else {
-                        result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes"), mapToConvert.get("seconds")));
-                    }
-                } else {
-                    result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes")));
-                }
-            } else {
-                result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), 0));
-            }
-        } else {
-            result = LocalDateTime.of(localDate, LocalTime.MIN);
-        }
-        return AsyncResult.forValue(result);
+        return AsyncResult.forValue(LocalDateTime.of(localDate, getLocalTimeForMap(mapToConvert, true).get()));
     }
 
     private LocalDate getLocalDateFromMap(Map<String, Integer> mapToConvert) {
@@ -62,10 +45,9 @@ public class TimeConversionServiceImpl implements TimeConversionService {
 
     @Async("threadPoolTaskExecutor")
     @Override
-    public Future<LocalDateTime> getTimeForEnd(Map<String, Integer> mapToConvert) {
+    public Future<LocalDateTime> getTimeForEnd(Map<String, Integer> mapToConvert) throws ExecutionException, InterruptedException {
         checkMap(mapToConvert);
         LocalDate localDate;
-        LocalDateTime result;
         if (mapToConvert.get("day") != null) {
             localDate = getLocalDateFromMap(mapToConvert);
         } else {
@@ -73,22 +55,36 @@ public class TimeConversionServiceImpl implements TimeConversionService {
             calendar.set(Calendar.MONTH, mapToConvert.get("month"));
             localDate = LocalDate.of(mapToConvert.get("year"), mapToConvert.get("month"), calendar.getActualMaximum(Calendar.DAY_OF_MONTH));
         }
+        return AsyncResult.forValue(LocalDateTime.of(localDate, getLocalTimeForMap(mapToConvert, false).get()));
+    }
+
+    @Override
+    public Future<LocalTime> getLocalTimeForMap(Map<String, Integer> mapToConvert, boolean start) {
+        LocalTime result;
         if (mapToConvert.get("hours") != null) {
             if (mapToConvert.get("minutes") != null) {
                 if (mapToConvert.get("seconds") != null) {
                     if (mapToConvert.get("milliseconds") != null) {
-                        result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes"), mapToConvert.get("seconds"), mapToConvert.get("milliseconds")));
+                        result = LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes"), mapToConvert.get("seconds"), mapToConvert.get("milliseconds"));
                     } else {
-                        result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes"), mapToConvert.get("seconds")));
+                        result = LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes"), mapToConvert.get("seconds"));
                     }
                 } else {
-                    result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes")));
+                    result = LocalTime.of(mapToConvert.get("hours"), mapToConvert.get("minutes"));
                 }
             } else {
-                result = LocalDateTime.of(localDate, LocalTime.of(mapToConvert.get("hours"), 59, 59, 999999999));
+                if(start) {
+                    result = LocalTime.of(mapToConvert.get("hours"), 0, 0);
+                }else{
+                    result = LocalTime.of(mapToConvert.get("hours"), 59, 59, 999999999);
+                }
             }
         } else {
-            result = LocalDateTime.of(localDate, LocalTime.MAX);
+            if(start) {
+                result = LocalTime.MIN;
+            }else{
+                result = LocalTime.MAX;
+            }
         }
         return AsyncResult.forValue(result);
     }

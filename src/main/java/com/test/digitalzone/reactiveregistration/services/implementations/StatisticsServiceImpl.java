@@ -4,8 +4,8 @@ import com.test.digitalzone.reactiveregistration.dto.StatisticsDto;
 import com.test.digitalzone.reactiveregistration.models.ViewEvent;
 import com.test.digitalzone.reactiveregistration.services.interfaces.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.util.Pair;
+import lombok.Setter;
+import net.agkn.hll.HLL;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.AsyncResult;
 import org.springframework.stereotype.Service;
@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -24,12 +25,23 @@ public class StatisticsServiceImpl implements StatisticsService {
     private final RedisService redisService;
     private final TablesService tablesService;
     private final StatisticsGenerationService statisticsGenerationService;
-    private final UniqueViewStatisticsService uniqueViewStatisticsService;
     //used to calculate the optimal size for bloom filter
     private static final double LN09 = -0.105305157;
 
+
     private LocalDateTime dayStart;
+
     private LocalDateTime dayEnd;
+
+    @Override
+    public void setDayStart(LocalDateTime start) {
+        this.dayStart = start;
+    }
+
+    @Override
+    public void setDayEnd(LocalDateTime end) {
+        this.dayEnd = end;
+    }
 
     @PostConstruct
     public void init() {
@@ -40,6 +52,13 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public StatisticsDto getCurrentDayStatistics() {
+        Function<? super Future<Long>, ? extends Long> extractor = future -> {
+            try {
+                return future.get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new IllegalStateException(e);
+            }
+        };
         Future<List<String>> tableNames = tablesService.getAllTables();
         List<Future<Long>> results = new ArrayList<>();
         try {
@@ -47,64 +66,64 @@ public class StatisticsServiceImpl implements StatisticsService {
                 results.add(statisticsGenerationService.getCurrentAmountFromTableByStartAndTheEnd(dayStart, dayEnd, name));
             }
         } catch (InterruptedException | ExecutionException e) {
-            throw new IllegalStateException(e.getMessage());
+            throw new IllegalStateException(e);
         }
-        return StatisticsDto.builder().count(results.stream().map(future -> {
-            try {
-                return future.get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new IllegalStateException(e);
-            }
-        }).reduce(0L, Long::sum)).unique(redisService.getTodayUniqueNumber()).build();
+        return StatisticsDto.builder().count(results.stream().map(extractor).reduce(0L, Long::sum)).unique(redisService.getTodayUniqueNumber()).build();
     }
 
     @Async("threadPoolTaskExecutor")
     @Override
-    public Future<StatisticsDto> getStatisticsByDates(LocalDateTime start, LocalDateTime end) {
+    public Future<StatisticsDto> getStatisticsByDates(LocalDateTime start, LocalDateTime end) throws ExecutionException, InterruptedException {
         Future<List<String>> tableNames = tablesService.getAllTables();
-        Long x = System.currentTimeMillis();
-        Future<Pair<Boolean, String>> resultFromIndexService = uniqueViewStatisticsService.getNameOfMergedUniqueIndex(start, end);
-        Pair<Boolean, String> caseAndNameForIndex;
-        try {
-            List<String> names = tableNames.get();
-            List<Future<List<ViewEvent>>> events = new ArrayList<>(names.size());
-            for (int i = 0; i < names.size(); i++) {
-                events.add(i, statisticsGenerationService.getAllEventsByTableBetween(start, end, names.get(i)));
-            }
 
-            List<List<ViewEvent>> resultEventsFromDatabase = new ArrayList<>(names.size());
-            caseAndNameForIndex = resultFromIndexService.get();
+        List<String> names = tableNames.get();
+        List<Future<List<ViewEvent>>> futureListOfEvents = new ArrayList<>(names.size());
 
-            List<Future<Boolean>> listToCheckVoidMethodsToComplete = new ArrayList<>(names.size());
-
-            for (int i = 0; i < events.size(); i++) {
-                resultEventsFromDatabase.add(i, events.get(i).get());
-                listToCheckVoidMethodsToComplete.add(i, statisticsGenerationService.addAllEventsToIndex(
-                        caseAndNameForIndex, resultEventsFromDatabase.get(i), start, end, names.get(i)));
-            }
-
-            for (Future<Boolean> checkVariable : listToCheckVoidMethodsToComplete) {
-                checkVariable.get();
-            }
-            Long uniqueViewersNumber = redisService.getUniqueNumberForTag(caseAndNameForIndex.getSecond());
-            int size = (int) Math.round(-uniqueViewersNumber / LN09);
-            List<Future<byte[]>> futureResultArraysToCall = new ArrayList<>(names.size());
-            for (int i = 0; i < names.size(); i++) {
-                futureResultArraysToCall.add(i, statisticsGenerationService.getResultDummyBloomFilter(size, resultEventsFromDatabase.get(i)));
-            }
-
-            List<byte[]> resultDummyBloomFilters = new ArrayList<>(names.size());
-            for(int i = 0; i < names.size(); i++){
-                resultDummyBloomFilters.add(i, futureResultArraysToCall.get(i).get());
-            }
-            Future<Long> countAll = statisticsGenerationService.calculateAllViews(resultEventsFromDatabase);
-            Future<Long> regularUsers = statisticsGenerationService.calculateResultForRegularUsers(resultDummyBloomFilters);
-            Long y = System.currentTimeMillis();
-            System.out.println(y - x);
-            return AsyncResult.forValue(StatisticsDto.builder().unique(uniqueViewersNumber).count(countAll.get()).regularUsers(regularUsers.get())
-                    .build());
-        } catch (InterruptedException | ExecutionException e) {
-            throw new IllegalStateException(e);
+        for (int i = 0; i < names.size(); i++) {
+            futureListOfEvents.add(i, statisticsGenerationService.getAllEventsByTableBetween(start, end, names.get(i)));
         }
+
+        List<List<ViewEvent>> listOfResultEventsFromDatabase = new ArrayList<>(names.size());
+        List<Future<Long>> listToCheckMethodsToComplete = new ArrayList<>(names.size());
+
+        List<ViewEvent> resultEvents = new ArrayList<>();
+        //в итоге было принято решения считать уникальных пользователей локально через hll, поскольку отправка всех необходимых пользователей в redis hll занимала катастрофические 5сек.
+        HLL hll = getHLL(15, 4);
+        int current = 0;
+        for (Future<List<ViewEvent>> futureListOfEvent : futureListOfEvents) {
+            resultEvents = futureListOfEvent.get();
+            if (resultEvents.size() == 0) continue;
+            listOfResultEventsFromDatabase.add(current, resultEvents);
+            listToCheckMethodsToComplete.add(statisticsGenerationService.addAllEventsToHLL(resultEvents, hll));
+            current++;
+        }
+
+        for (int i = 0; i < current; i++) {
+            listToCheckMethodsToComplete.get(i).get();
+        }
+
+        Long uniqueViewersNumber = hll.cardinality();
+        int size = (int) Math.round(-uniqueViewersNumber / LN09);
+
+        List<Future<byte[]>> futureResultArraysToCall = new ArrayList<>(listToCheckMethodsToComplete.size());
+
+        for (int i = 0; i < current; i++) {
+            futureResultArraysToCall.add(i, statisticsGenerationService.getDummyBloomFilter(size, listOfResultEventsFromDatabase.get(i)));
+        }
+
+        List<byte[]> dummyBloomFiltersList = new ArrayList<>();
+        for (int i = 0; i < current; i++) {
+            dummyBloomFiltersList.add(i, futureResultArraysToCall.get(i).get());
+        }
+
+        Future<Long> countAll = statisticsGenerationService.calculateAllViews(listOfResultEventsFromDatabase);
+        Future<Long> regularUsers = statisticsGenerationService.calculateResultForRegularUsers(dummyBloomFiltersList);
+
+        return AsyncResult.forValue(StatisticsDto.builder().unique(uniqueViewersNumber).count(countAll.get()).regularUsers(regularUsers.get()).build());
+    }
+
+
+    private HLL getHLL(int buckets, int i) {
+        return new HLL(buckets, i);
     }
 }

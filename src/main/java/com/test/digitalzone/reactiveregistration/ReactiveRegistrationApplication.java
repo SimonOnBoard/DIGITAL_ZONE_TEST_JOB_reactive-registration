@@ -2,6 +2,7 @@ package com.test.digitalzone.reactiveregistration;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import net.agkn.hll.HLL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.SpringApplication;
@@ -18,8 +19,14 @@ import org.springframework.data.redis.repository.configuration.EnableRedisReposi
 import org.springframework.data.redis.serializer.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 import javax.sql.DataSource;
 import java.util.zip.Adler32;
@@ -28,6 +35,8 @@ import java.util.zip.Adler32;
 @EnableAsync
 @EnableRedisRepositories
 @EnableTransactionManagement
+@EnableSwagger2
+@EnableScheduling
 public class ReactiveRegistrationApplication {
     @Autowired
     public Environment environment;
@@ -87,9 +96,12 @@ public class ReactiveRegistrationApplication {
         return new HikariDataSource(hikariConfig);
     }
 
-//    @Bean
-//    @Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-//    public Adler32 adler32(){
-//        return new Adler32();
-//    }
+    @Bean
+    public Docket api() {
+        return new Docket(DocumentationType.SWAGGER_2)
+                .select()
+                .apis(RequestHandlerSelectors.any())
+                .paths(PathSelectors.any())
+                .build();
+    }
 }

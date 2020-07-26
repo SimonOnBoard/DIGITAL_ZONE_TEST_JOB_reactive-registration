@@ -66,6 +66,8 @@ public class ViewEventFindQueuesRepositoryImpl implements ViewEventFindQueuesRep
         return jdbcTemplate.query(sqlToRun, new Object[]{start, end}, viewEventRowMapper);
     }
 
+
+    //сознательно не достаю здесь время, оно мне не понадобится для подстчёта в данном случае, а так можно сэкономить несколько миллисекунд на ковертации объекта LocalDateTime
     private final RowMapper<ViewEvent> viewEventRowMapper = (row, rowNumber) ->
             ViewEvent.builder()
                     .id(row.getLong("id"))

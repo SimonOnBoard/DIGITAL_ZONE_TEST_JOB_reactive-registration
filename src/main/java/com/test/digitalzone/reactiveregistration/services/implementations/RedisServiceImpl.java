@@ -2,7 +2,6 @@ package com.test.digitalzone.reactiveregistration.services.implementations;
 
 import com.test.digitalzone.reactiveregistration.repositories.interfaces.RedisRepository;
 import com.test.digitalzone.reactiveregistration.services.interfaces.RedisService;
-import jdk.nashorn.internal.objects.annotations.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.scheduling.annotation.Async;
@@ -21,6 +20,7 @@ import java.util.List;
 public class RedisServiceImpl implements RedisService {
     private Long actualCount;
     private final RedisRepository redisRepository;
+
     @Setter
     private String day;
 
@@ -34,12 +34,12 @@ public class RedisServiceImpl implements RedisService {
     @Async("threadPoolTaskExecutor")
     @Override
     public ListenableFuture<Long> publishUserIdForToday(String userId) {
-        return AsyncResult.forValue(redisRepository.pfAdd(day.toString(), userId));
+        return AsyncResult.forValue(redisRepository.pfAdd(day, userId));
     }
 
     @Override
     public void updateActualTodayNumber() {
-        actualCount = redisRepository.pfCount(day.toString());
+        actualCount = redisRepository.pfCount(day);
     }
 
     @Override
